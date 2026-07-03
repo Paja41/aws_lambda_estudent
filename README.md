@@ -14,7 +14,6 @@ instalirali sve potrebne pakete. Nakon toga, komandom `npm run dev` pokrećete a
 Za razvoj aplikacije korišćeni su:
 * HTML
 * CSS
-* JavaScript
 * TypeScript
 * React
 * Session storage, MockAPI i React hooks
@@ -35,3 +34,11 @@ Jedna od najbitnijih novih funkcionalnosti je *kontakt stranica*, sa koje studen
 U donjem levom uglu se takođe nalazi i *AI asistent*, koji pomaže studentu u navigaciji po aplikaciji i dodatnim pitanjima vezanim za studiranje.
 
 U gornjem desnom uglu student može da klikne na svoje ime, što će ga odvesti na svoju profil stranicu gde može proveriti administrativne podatke. Pored profila je takođe i dugme za odjavu sa aplikacije.
+
+## Nefunkcionalni zahtevi
+* Osigurana je responzivnost na mobilnim uređajima
+* Implementiran je dark mode
+* Sprečeno je višestruko slanje istih podataka pre završetka obrade prvog slanja
+* Omogućen fallback response za AI asistenta u slučaju da je API nedostupan
+* U slučaju da se slika ne može prikazati, prikazuje se alternativni tekst
+* Validacija podataka koji se upisuju u forme (email sadrži @, JMBG ima 13 karaktera...)
