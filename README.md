@@ -22,7 +22,7 @@ Za razvoj aplikacije korišćeni su:
 Pri prvom ulazu na sajt otvara se stranica prijave, odakle ukoliko korisnik nije prijavljen može da ode na stranicu registracije.
 Jednom kada je registrovan, student ima pristup svojim prijavljenim ispitima, studentskom računu, pregledu svojih predmeta i raznim drugim informacijama. Uneti podaci se čuvaju u SessionStorage u slučaju da se stranica refreshuje.
 
-*Početna stranica* u gornjem levom uglu takođe poseduje dark mode toggle, tako da korisnici mogu lako da promene pozadinu na onu koja im više prija. Tu može da vidi najnovija obaveštenja kao i kalendar sa bitnim datumima u datom mesecu. Sa leve strane se nalazi sidebar odakle se može doći sa bilo koje stranice na bilo koju stranicu aplikacije.
+*Početna stranica* u gornjem levom uglu takođe poseduje dark mode toggle, tako da korisnici mogu lako da promene pozadinu na onu koja im više prija. Tu mogu da vide najnovija obaveštenja kao i kalendar sa bitnim datumima u datom mesecu. Sa leve strane se nalazi sidebar odakle se može doći sa bilo koje stranice na bilo koju stranicu aplikacije.
 
 Stranica *Stanje na računu* omogućava studentu da proveri koliko novca ima na svom računu, odštampa uplatnicu, i uradi simulaciju uplate novca za brzu proveru stanja nakon uplate.
 Na stranicama *prijave* i *prijavljenih ispita* student može da u određenom roku prijavi ili odjavi ispite koje želi da polaže.
