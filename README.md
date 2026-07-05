@@ -42,3 +42,26 @@ U gornjem desnom uglu student može da klikne na svoje ime, što će ga odvesti 
 * Omogućen fallback response za AI asistenta u slučaju da je API nedostupan
 * U slučaju da se slika ne može prikazati, prikazuje se alternativni tekst
 * Validacija podataka koji se upisuju u forme (email sadrži @, JMBG ima 13 karaktera...)
+
+## Drvo komponenti
+```text
+App
+└── BrowserRouter
+    └── Routes
+        ├── LoginPage (Ruta: /login)
+        ├── RegisterPage (Ruta: /register)
+        └── StudentPortal (Ruta: /portal/:tab)
+            └── ThemeProvider (Upravljanje svetlom/tamnom temom)
+                └── StudentPortalContent
+                    ├── Banner
+                    └── Glavni Sadržaj
+                        ├── AiAssistant
+                        ├── HomeView
+                        ├── AccountBalanceView
+                        ├── PrijavaIspitaView
+                        ├── PrijavljeniIspitiView
+                        ├── PrikazPredmetaView
+                        ├── RasporedNastaveView
+                        ├── PolozeniIspitiView
+                        ├── ProfilStudentaView
+                        └── KontaktView
