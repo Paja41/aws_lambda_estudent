@@ -65,7 +65,7 @@ App
                         ├── PolozeniIspitiView
                         ├── ProfilStudentaView
                         └── KontaktView
-
+```
 # eStudent na AWS — Event-driven arhitektura (Lambda + S3 + SQS)
 
 Ovaj modul prebacuje postojeći eStudent frontend na AWS i dodaje asinhroni
@@ -157,13 +157,13 @@ Skripta radi build Lambde, `sam deploy`, upisuje `VITE_PRIJAVE_API_URL` u
 `.env.production`, gradi frontend i sync-uje `dist/` na S3. Na kraju ispiše
 javni URL sajta.
 
-### Ručno (ako više voliš korak-po-korak)
+### Ručno
 
 ```bash
 sam build --template cloud/template.yaml
 sam deploy --guided            # prvi put; zapamti podešavanja u samconfig.toml
 
-# procitaj outpute
+# pročitaj outpute
 aws cloudformation describe-stacks --stack-name estudent-prijave \
   --query "Stacks[0].Outputs" --output table
 
