@@ -8,15 +8,21 @@ import {
   Phone, 
   Mail, 
   FileText, 
-  X, 
-  MapPin, 
-  Maximize2 
+  X
 } from "lucide-react";
 
 interface RegisterPageProps {
   onNavigateToLogin: () => void;
   onRegisterComplete?: (name: string, indexNum: string) => void;
 }
+
+const toBase64 = (file: File): Promise<string> => 
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
 
 export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: RegisterPageProps) {
   
@@ -28,12 +34,10 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
   const [indexNum, setIndexNum] = useState(() => sessionStorage.getItem("reg_indexNum") || "");
   const [acceptedTerms, setAcceptedTerms] = useState(() => sessionStorage.getItem("reg_acceptedTerms") === "true");
 
-  // File upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Loading & Flow control
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [regSuccess, setRegSuccess] = useState(false);
@@ -48,7 +52,6 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
     sessionStorage.setItem("reg_acceptedTerms", String(acceptedTerms));
   }, [firstName, lastName, city, phone, jmbg, indexNum, acceptedTerms]);
 
-  // Drag and drop event handlers
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -84,12 +87,10 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
     fileInputRef.current?.click();
   };
 
-  
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
 
-    
     if (!firstName.trim()) {
       setErrorMsg("Molimo unesite Vaše ime.");
       return;
@@ -114,26 +115,45 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
       setErrorMsg("Molimo unesite broj indeksa.");
       return;
     }
-
-    
     if (!selectedFile) {
       setErrorMsg("Molimo zakačite sliku prve dve stranice Vašeg indeksa.");
       return;
     }
-
-    
     if (!acceptedTerms) {
-      setErrorMsg("Morate potvrditi da su uneti podaci ispravni i saglasiti se sa njihovim hrišćenjem.");
+      setErrorMsg("Morate potvrditi da su uneti podaci ispravni i saglasiti se sa njihovim korišćenjem.");
       return;
     }
 
-    
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+
+    try {
+      const slikaBase64 = await toBase64(selectedFile);
+
+      const podaci = {
+        ime: firstName.trim(),
+        prezime: lastName.trim(),
+        grad: city.trim(),
+        telefon: phone.trim(),
+        jmbg: jmbg.trim(),
+        indeks: indexNum.trim(),
+        slikaBase64: slikaBase64
+      };
+
+      // Fiksni URL generisan iz tvog API Gateway-a
+      const apiUrl = "https://774f9mvryh.execute-api.eu-north-1.amazonaws.com/prod/registracija";
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(podaci)
+      });
+
+      if (!response.ok) {
+        throw new Error("Greška prilikom čuvanja podataka na serveru.");
+      }
+
       setRegSuccess(true);
 
-      // Čisti se session storage na kraju uspešne registracije
       sessionStorage.removeItem("reg_firstName");
       sessionStorage.removeItem("reg_lastName");
       sessionStorage.removeItem("reg_city");
@@ -141,17 +161,21 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
       sessionStorage.removeItem("reg_jmbg");
       sessionStorage.removeItem("reg_indexNum");
       sessionStorage.removeItem("reg_acceptedTerms");
-    }, 1500);
+
+    } catch (error) {
+      console.error("Greska pri registraciji:", error);
+      setErrorMsg("Došlo je do greške pri komunikaciji sa serverom. Pokušajte ponovo.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="w-full max-w-[1240px] px-4 md:px-0 transition-all duration-300">
-      {}
       <h1 className="text-white text-[32px] font-medium tracking-wide text-center mb-5 select-none">
         Registrujte se
       </h1>
 
-      {}
       <div className="bg-[#EDF2FA] rounded-[16px] shadow-2xl p-6 md:p-8 w-full border border-white/20 relative">
         <AnimatePresence mode="wait">
           {!regSuccess ? (
@@ -164,11 +188,7 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
               onSubmit={handleSubmit}
               className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start"
             >
-              
-              {}
               <div className="lg:col-span-7 flex flex-col gap-4">
-                
-                {}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5 text-left">
                     <label className="text-gray-700 text-[14.5px] font-semibold select-none pl-1">
@@ -196,7 +216,6 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
                   </div>
                 </div>
 
-                {}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5 text-left">
                     <label className="text-gray-700 text-[14.5px] font-semibold select-none pl-1">
@@ -224,7 +243,6 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
                   </div>
                 </div>
 
-                {}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5 text-left">
                     <label className="text-gray-700 text-[14.5px] font-semibold select-none pl-1">
@@ -253,7 +271,6 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
                   </div>
                 </div>
 
-                {}
                 <div className="flex flex-col text-left gap-1 mt-1">
                   <input
                     type="file"
@@ -307,7 +324,6 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
                   </p>
                 </div>
 
-                {}
                 <div className="flex items-start gap-2.5 mt-3 text-left">
                   <input
                     id="accept-terms-check"
@@ -324,7 +340,6 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
                   </label>
                 </div>
 
-                {}
                 {errorMsg && (
                   <motion.div
                     initial={{ opacity: 0, y: -4 }}
@@ -335,7 +350,6 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
                   </motion.div>
                 )}
 
-                {}
                 <div className="flex justify-start mt-2">
                   <button
                     type="submit"
@@ -349,13 +363,9 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
                     )}
                   </button>
                 </div>
-
               </div>
 
-              {}
               <div className="lg:col-span-5 flex flex-col gap-5 h-full justify-between">
-                
-                {}
                 <div className="relative w-full aspect-[4/3] sm:aspect-video lg:aspect-[4/3] rounded-lg overflow-hidden border border-slate-300 shadow bg-white flex flex-col">
                    <iframe
                     title="Lokacija Fakulteta organizacionih nauka"
@@ -367,7 +377,6 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
                   />
                 </div>
 
-                {/* Communication channels */}
                 <div className="flex flex-row flex-nowrap items-center justify-between gap-2.5 px-0.5 mt-2.5 w-full select-none">
                   <a 
                     href="tel:+381113950813"
@@ -393,10 +402,8 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
                     <FonLogo />
                   </div>
                 </div>
-
               </div>
 
-              {/* Embedded login routing footer link */}
               <div className="lg:col-span-12 mt-4 pt-4 border-t border-slate-300/40 text-left select-none">
                 <span className="text-gray-500 text-[14.5px] font-medium whitespace-nowrap">
                   Već imate studentski nalog?{" "}
@@ -409,7 +416,6 @@ export function RegisterPage({ onNavigateToLogin, onRegisterComplete }: Register
                   Prijavite se.
                 </button>
               </div>
-
             </motion.form>
           ) : (
             <motion.div

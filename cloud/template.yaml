@@ -1,0 +1,286 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  eStudent - Event-driven prijava ispita/kolokvijuma i registracija.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: estudent-prijave
+    Description: Prefiks za imena resursa (mora biti globalno jedinstven zbog S3).
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+    Runtime: nodejs20.x
+    Architectures:
+      - arm64
+
+Resources:
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-frontend"
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadForWebsite
+            Effect: Allow
+            Principal: "*"
+            Action: "s3:GetObject"
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+
+  ConfirmationsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-potvrde"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+
+  PrijaveDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${ProjectName}-dlq"
+      MessageRetentionPeriod: 1209600
+
+  PrijaveQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${ProjectName}-queue"
+      VisibilityTimeout: 60
+      MessageRetentionPeriod: 345600
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt PrijaveDLQ.Arn
+        maxReceiveCount: 3
+
+  ProcessPrijavaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-process"
+      Handler: index.handler
+      CodeUri: lambda/process-prijava/
+      Environment:
+        Variables:
+          CONFIRMATIONS_BUCKET: !Ref ConfirmationsBucket
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Sub "${ProjectName}-potvrde"
+      Events:
+        SqsTrigger:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt PrijaveQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
+  ApiGatewayToSqsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SendToPrijaveQueue
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt PrijaveQueue.Arn
+
+  PrijaveApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "${ProjectName}-api"
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  PrijaveResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PrijaveApi
+      ParentId: !GetAtt PrijaveApi.RootResourceId
+      PathPart: prijave
+
+  PrijavePostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref PrijaveApi
+      ResourceId: !Ref PrijaveResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        Credentials: !GetAtt ApiGatewayToSqsRole.Arn
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:sqs:path/${AWS::AccountId}/${ProjectName}-queue"
+        PassthroughBehavior: NEVER
+        RequestParameters:
+          integration.request.header.Content-Type: "'application/x-www-form-urlencoded'"
+        RequestTemplates:
+          application/json: "Action=SendMessage&MessageBody=$util.urlEncode($input.body)"
+        IntegrationResponses:
+          - StatusCode: "202"
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: '{"status":"accepted","message":"Prijava primljena i ceka obradu."}'
+      MethodResponses:
+        - StatusCode: "202"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+
+  PrijaveOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref PrijaveApi
+      ResourceId: !Ref PrijaveResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: "200"
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ""
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  PrijaveApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - PrijavePostMethod
+      - PrijaveOptionsMethod
+      - RegistracijaPostMethod
+      - RegistracijaOptionsMethod
+    Properties:
+      RestApiId: !Ref PrijaveApi
+
+  PrijaveApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref PrijaveApi
+      DeploymentId: !Ref PrijaveApiDeployment
+      StageName: prod
+
+  # ===================================================================
+  #  RURA ZA REGISTRACIJU (/registracija) - sinhrona Lambda
+  # ===================================================================
+  RegistracijaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-registracija"
+      Handler: index.handler
+      CodeUri: lambda/process-registracija/
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref ConfirmationsBucket
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Sub "${ProjectName}-potvrde"
+
+  RegistracijaFunctionInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref RegistracijaFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${PrijaveApi}/*/*/*"
+
+  RegistracijaResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref PrijaveApi
+      ParentId: !GetAtt PrijaveApi.RootResourceId
+      PathPart: registracija
+
+  RegistracijaPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref PrijaveApi
+      ResourceId: !Ref RegistracijaResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RegistracijaFunction.Arn}/invocations"
+
+  RegistracijaOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref PrijaveApi
+      ResourceId: !Ref RegistracijaResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: "200"
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ""
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+Outputs:
+  FrontendURL:
+    Description: "Javni URL statickog sajta (eStudent frontend)"
+    Value: !GetAtt FrontendBucket.WebsiteURL
+
+  ApiEndpoint:
+    Description: "URL za POST prijave (stavi u VITE_PRIJAVE_API_URL)"
+    Value: !Sub "https://${PrijaveApi}.execute-api.${AWS::Region}.amazonaws.com/prod/prijave"
+
+  ConfirmationsBucketName:
+    Description: "S3 bucket gde se cuvaju potvrde o prijavi"
+    Value: !Ref ConfirmationsBucket
+
+  QueueURL:
+    Description: "URL SQS reda poruka"
+    Value: !Ref PrijaveQueue

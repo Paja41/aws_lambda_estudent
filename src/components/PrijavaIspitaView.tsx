@@ -15,6 +15,7 @@ import { Calendar } from "./Calendar";
 import { FonLogo } from "./FonLogo";
 import { Exam } from "../models/Exam";
 import { useTheme } from "../context/ThemeContext";
+import { posaljiPrijavu } from "../services/prijavaApi";
 
 export type PeriodType = "druga-kolokvijumska" | "junski-rok" | "julski-rok";
 
@@ -129,6 +130,19 @@ export function PrijavaIspitaView({
       
       addPaymentRecord(`Prijava kolokvijuma: ${confirmExam.name} (Slobodan unos)`, "0");
     }
+
+    void posaljiPrijavu({
+      studentName,
+      studentIndex,
+      examKey: `${getPeriodLabel(selectedPeriod)}-${confirmExam.name}`,
+      examName: confirmExam.name,
+      examCode: confirmExam.code,
+      espb: confirmExam.espb,
+      periodLabel: getPeriodLabel(selectedPeriod),
+      date: confirmExam.date,
+      location: confirmExam.price > 0 ? "Amfiteatar 1" : "Kabinet 52",
+      price: confirmExam.price,
+    });
 
     setSuccessInfo(`Uspešno ste prijavili predmet: **${confirmExam.name}** za **${getPeriodLabel(selectedPeriod)}**!`);
     setConfirmExam(null);
